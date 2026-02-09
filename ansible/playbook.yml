@@ -1,0 +1,81 @@
+---
+- name: Wait for SSH on MAN
+  hosts: man
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 22
+        timeout: 600
+
+- name: Wait for SSH on Wazuh via MAN (ProxyJump)
+  hosts: wazuh
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 22
+        timeout: 600
+
+- name: Install Wazuh all-in-one on Wazuh VM
+  hosts: wazuh
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        update_cache: true
+        name:
+          - curl
+          - unzip
+          - ca-certificates
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Download Wazuh installer
+      ansible.builtin.get_url:
+        url: "https://packages.wazuh.com/4.7/wazuh-install.sh"
+        dest: "/root/wazuh-install.sh"
+        mode: "0755"
+
+    - name: Run Wazuh AIO installer (first time only)
+      ansible.builtin.command: "/root/wazuh-install.sh -a"
+      args:
+        creates: "/var/ossec/bin/wazuh-control"
+
+    - name: Check core services
+      ansible.builtin.shell: |
+        set -e
+        systemctl is-active wazuh-manager
+        systemctl is-active wazuh-indexer || true
+        systemctl is-active wazuh-dashboard || true
+      changed_when: false
+
+    - name: Show listening ports (sanity)
+      ansible.builtin.shell: |
+        ss -lntup | egrep ':(1514|1515|55000|5601)\b' || true
+      changed_when: false
+
+- name: Verify MAN can reach Wazuh services over MAN network
+  hosts: man
+  become: true
+  gather_facts: true
+  vars:
+    wazuh_ip: "{{ hostvars['wazuh'].ansible_host }}"
+  tasks:
+    - name: Install netcat
+      ansible.builtin.apt:
+        update_cache: true
+        name: netcat-openbsd
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Test TCP ports
+      ansible.builtin.shell: |
+        set -e
+        for p in 22 1514 1515 55000 5601; do
+          nc -zvw3 {{ wazuh_ip }} $p
+        done
+      changed_when: false
