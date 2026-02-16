@@ -1,18 +1,20 @@
-name: wazuh-siem-lab
+name: wazuh-siem-lab-light
 
 # =============================================================================
-# HOSTS - Virtual Machines
+# ULTRA-LIGHT VERSION - Single Router Architecture
+# Uses only 5 VMs instead of 8 to minimize resource usage
 # =============================================================================
+
 hosts:
-  # Wazuh Manager - Central SIEM Server (Management Network)
+  # Wazuh Manager - Central SIEM Server
   - name: wazuh-manager
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: m1.small  # Needs more resources for indexer + dashboard
+    flavor: m1.tiny
     hidden: false
 
-  # Web Server - Protected Asset (DMZ Network)
+  # Web Server - Monitored Asset
   - name: web-server
     base_box:
       image: debian-12-x86_64
@@ -20,7 +22,7 @@ hosts:
     flavor: m1.tiny
     hidden: false
 
-  # Database Server - Protected Asset (Internal Network)
+  # Database Server - Monitored Asset
   - name: db-server
     base_box:
       image: debian-12-x86_64
@@ -28,120 +30,86 @@ hosts:
     flavor: m1.tiny
     hidden: false
 
-  # Kali Attacker - Red Team Machine (Attacker Network)
+  # Kali Attacker - Red Team Machine
   - name: kali-attacker
     base_box:
-      image: debian-12-x86_64  # We'll install Kali tools on Debian
+      image: debian-12-x86_64
       man_user: debian
-    flavor: m1.small
+    flavor: m1.tiny
     hidden: false
 
 # =============================================================================
-# ROUTERS - Network Segmentation (Critical for Security Labs!)
+# ROUTERS - Single Central Router (saves 3 VMs!)
 # =============================================================================
 routers:
-  # Management Router - Connects Wazuh Manager to all networks
-  - name: mgmt-router
-    base_box:
-      image: debian-12-x86_64
-      man_user: debian
-    flavor: m1.tiny
-
-  # DMZ Router - Separates DMZ from internal network
-  - name: dmz-router
-    base_box:
-      image: debian-12-x86_64
-      man_user: debian
-    flavor: m1.tiny
-
-  # Internal Router - Protects internal assets
-  - name: internal-router
-    base_box:
-      image: debian-12-x86_64
-      man_user: debian
-    flavor: m1.tiny
-
-  # Attacker Router - Isolates attacker network (simulates internet)
-  - name: attacker-router
+  - name: central-router
     base_box:
       image: debian-12-x86_64
       man_user: debian
     flavor: m1.tiny
 
 # =============================================================================
-# NETWORKS - Four-tier architecture for realistic SOC environment
+# NETWORKS - Same 4-tier architecture
 # =============================================================================
 networks:
-  # 1. Management Network - Wazuh Manager + Monitoring
   - name: mgmt-network
     cidr: 10.10.10.0/24
-    accessible_by_user: false  # Only accessible via routers
+    accessible_by_user: false
 
-  # 2. DMZ Network - Public-facing services (web server)
   - name: dmz-network
     cidr: 10.10.20.0/24
     accessible_by_user: false
 
-  # 3. Internal Network - Backend services (database)
   - name: internal-network
     cidr: 10.10.30.0/24
     accessible_by_user: false
 
-  # 4. Attacker Network - Simulates external threat actor
   - name: attacker-network
     cidr: 10.10.40.0/24
-    accessible_by_user: true  # Users can access Kali from here
+    accessible_by_user: true
 
 # =============================================================================
 # NET_MAPPINGS - Host to Network assignments
 # =============================================================================
 net_mappings:
-  # Wazuh Manager in Management Network
   - host: wazuh-manager
     network: mgmt-network
     ip: 10.10.10.10
 
-  # Web Server in DMZ
   - host: web-server
     network: dmz-network
     ip: 10.10.20.10
 
-  # Database Server in Internal Network
   - host: db-server
     network: internal-network
     ip: 10.10.30.10
 
-  # Kali Attacker in Attacker Network
   - host: kali-attacker
     network: attacker-network
     ip: 10.10.40.10
 
 # =============================================================================
-# ROUTER_MAPPINGS - Critical routing configuration
+# ROUTER_MAPPINGS - Single router connected to all networks
 # =============================================================================
 router_mappings:
-  # Management Router - Gateway for Wazuh Manager
-  - router: mgmt-router
+  - router: central-router
     network: mgmt-network
     ip: 10.10.10.1
 
-  # DMZ Router - Gateway for DMZ
-  - router: dmz-router
+  - router: central-router
     network: dmz-network
     ip: 10.10.20.1
 
-  # Internal Router - Gateway for Internal Network
-  - router: internal-router
+  - router: central-router
     network: internal-network
     ip: 10.10.30.1
 
-  # Attacker Router - Gateway for Attacker Network
-  - router: attacker-router
+  - router: central-router
     network: attacker-network
     ip: 10.10.40.1
 
 # =============================================================================
-# GROUPS - Ansible inventory groups
+# GROUPS
 # =============================================================================
 groups:
   - name: wazuh-servers
