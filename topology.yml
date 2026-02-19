@@ -1,9 +1,9 @@
-name: wazuh-siem-lab-full-optimized
+name: wazuh-siem-lab-working
 
 # =============================================================================
-# FULL 4-ROUTER TOPOLOGY WITH CUSTOM FLAVORS
-# Uses oryx.micro for routers to minimize resource usage
-# Total: 9 vCPUs, ~4.5 GB RAM (fits in 40-core quota: 19 + 9 = 28)
+# WORKING TOPOLOGY - NO ROUTERS (KYPO routers can be problematic)
+# Direct network connections work reliably
+# Total: 5 VMs, 6 vCPUs, ~4 GB RAM
 # =============================================================================
 
 hosts:
@@ -12,7 +12,7 @@ hosts:
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: oryx.small  # 2 vCPU, 2 GB RAM
+    flavor: m1.small  # 2 vCPU, 2 GB RAM, 20 GB disk
     hidden: false
 
   # Web Server - Monitored Asset (DMZ)
@@ -20,7 +20,7 @@ hosts:
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: oryx.tiny  # 1 vCPU, 512 MB RAM
+    flavor: m1.tiny  # 1 vCPU, 512 MB RAM, 10 GB disk (we fixed this!)
     hidden: false
 
   # Database Server - Monitored Asset (Internal)
@@ -28,7 +28,7 @@ hosts:
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: oryx.tiny  # 1 vCPU, 512 MB RAM
+    flavor: m1.tiny  # 1 vCPU, 512 MB RAM, 10 GB disk
     hidden: false
 
   # Kali Attacker - Red Team Machine
@@ -36,104 +36,46 @@ hosts:
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: oryx.tiny  # 1 vCPU, 512 MB RAM
+    flavor: m1.tiny  # 1 vCPU, 512 MB RAM, 10 GB disk
     hidden: false
 
 # =============================================================================
-# ROUTERS - 4 separate routers for realistic network segmentation
-# =============================================================================
-routers:
-  # Management Router
-  - name: mgmt-router
-    base_box:
-      image: debian-12-x86_64
-      man_user: debian
-    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
-
-  # DMZ Router
-  - name: dmz-router
-    base_box:
-      image: debian-12-x86_64
-      man_user: debian
-    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
-
-  # Internal Router
-  - name: internal-router
-    base_box:
-      image: debian-12-x86_64
-      man_user: debian
-    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
-
-  # Attacker Router
-  - name: attacker-router
-    base_box:
-      image: debian-12-x86_64
-      man_user: debian
-    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
-
-# =============================================================================
-# NETWORKS - 4-tier architecture
+# NETWORKS - Simplified 2-network architecture
 # =============================================================================
 networks:
-  - name: mgmt-network
+  # Management/Protected Network - Wazuh Manager + Protected Assets
+  - name: protected-network
     cidr: 10.10.10.0/24
     accessible_by_user: false
 
-  - name: dmz-network
-    cidr: 10.10.20.0/24
-    accessible_by_user: false
-
-  - name: internal-network
-    cidr: 10.10.30.0/24
-    accessible_by_user: false
-
+  # Attacker Network - Kali machine (simulates internet)
   - name: attacker-network
     cidr: 10.10.40.0/24
     accessible_by_user: true
 
 # =============================================================================
-# NET_MAPPINGS
+# NET_MAPPINGS - All on same network for simplicity
 # =============================================================================
 net_mappings:
+  # Wazuh Manager
   - host: wazuh-manager
-    network: mgmt-network
+    network: protected-network
     ip: 10.10.10.10
 
+  # Web Server (will be attack target)
   - host: web-server
-    network: dmz-network
-    ip: 10.10.20.10
+    network: protected-network
+    ip: 10.10.10.20
 
+  # Database Server
   - host: db-server
-    network: internal-network
-    ip: 10.10.30.10
+    network: protected-network
+    ip: 10.10.10.30
 
+  # Kali Attacker (on separate network)
   - host: kali-attacker
     network: attacker-network
     ip: 10.10.40.10
-
-# =============================================================================
-# ROUTER_MAPPINGS
-# =============================================================================
-router_mappings:
-  # Management Router
-  - router: mgmt-router
-    network: mgmt-network
-    ip: 10.10.10.1
-
-  # DMZ Router
-  - router: dmz-router
-    network: dmz-network
-    ip: 10.10.20.1
-
-  # Internal Router
-  - router: internal-router
-    network: internal-network
-    ip: 10.10.30.1
-
-  # Attacker Router
-  - router: attacker-router
-    network: attacker-network
-    ip: 10.10.40.1
 
 # =============================================================================
 # GROUPS
