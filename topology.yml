@@ -1,8 +1,9 @@
-name: wazuh-siem-lab-light
+name: wazuh-siem-lab-full-optimized
 
 # =============================================================================
-# ULTRA-LIGHT VERSION - Single Router Architecture
-# Uses only 5 VMs instead of 8 to minimize resource usage
+# FULL 4-ROUTER TOPOLOGY WITH CUSTOM FLAVORS
+# Uses oryx.micro for routers to minimize resource usage
+# Total: 9 vCPUs, ~4.5 GB RAM (fits in 40-core quota: 19 + 9 = 28)
 # =============================================================================
 
 hosts:
@@ -11,23 +12,23 @@ hosts:
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: m1.tiny
+    flavor: oryx.small  # 2 vCPU, 2 GB RAM
     hidden: false
 
-  # Web Server - Monitored Asset
+  # Web Server - Monitored Asset (DMZ)
   - name: web-server
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: m1.tiny
+    flavor: oryx.tiny  # 1 vCPU, 512 MB RAM
     hidden: false
 
-  # Database Server - Monitored Asset
+  # Database Server - Monitored Asset (Internal)
   - name: db-server
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: m1.tiny
+    flavor: oryx.tiny  # 1 vCPU, 512 MB RAM
     hidden: false
 
   # Kali Attacker - Red Team Machine
@@ -35,21 +36,43 @@ hosts:
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: m1.tiny
+    flavor: oryx.tiny  # 1 vCPU, 512 MB RAM
     hidden: false
 
 # =============================================================================
-# ROUTERS - Single Central Router (saves 3 VMs!)
+# ROUTERS - 4 separate routers for realistic network segmentation
 # =============================================================================
 routers:
-  - name: central-router
+  # Management Router
+  - name: mgmt-router
     base_box:
       image: debian-12-x86_64
       man_user: debian
-    flavor: m1.tiny
+    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
+
+  # DMZ Router
+  - name: dmz-router
+    base_box:
+      image: debian-12-x86_64
+      man_user: debian
+    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
+
+  # Internal Router
+  - name: internal-router
+    base_box:
+      image: debian-12-x86_64
+      man_user: debian
+    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
+
+  # Attacker Router
+  - name: attacker-router
+    base_box:
+      image: debian-12-x86_64
+      man_user: debian
+    flavor: oryx.micro  # 1 vCPU, 256 MB RAM
 
 # =============================================================================
-# NETWORKS - Same 4-tier architecture
+# NETWORKS - 4-tier architecture
 # =============================================================================
 networks:
   - name: mgmt-network
@@ -69,7 +92,7 @@ networks:
     accessible_by_user: true
 
 # =============================================================================
-# NET_MAPPINGS - Host to Network assignments
+# NET_MAPPINGS
 # =============================================================================
 net_mappings:
   - host: wazuh-manager
@@ -89,22 +112,26 @@ net_mappings:
     ip: 10.10.40.10
 
 # =============================================================================
-# ROUTER_MAPPINGS - Single router connected to all networks
+# ROUTER_MAPPINGS
 # =============================================================================
 router_mappings:
-  - router: central-router
+  # Management Router
+  - router: mgmt-router
     network: mgmt-network
     ip: 10.10.10.1
 
-  - router: central-router
+  # DMZ Router
+  - router: dmz-router
     network: dmz-network
     ip: 10.10.20.1
 
-  - router: central-router
+  # Internal Router
+  - router: internal-router
     network: internal-network
     ip: 10.10.30.1
 
-  - router: central-router
+  # Attacker Router
+  - router: attacker-router
     network: attacker-network
     ip: 10.10.40.1
 
